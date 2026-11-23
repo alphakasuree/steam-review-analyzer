@@ -11,3 +11,7 @@ steam_review_data_*/
 .env
 .env.*
 web/dist/
+
+.bert_lib/
+.bert_model/
+.bert_runs/
