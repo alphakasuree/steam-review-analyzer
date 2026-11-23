@@ -1,0 +1,30 @@
+<!DOCTYPE html><html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>BERT 스팀 리뷰 분석</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f2f5f4;color:#182f32;font:16px/1.6 "Malgun Gothic",sans-serif}main{max-width:1020px;margin:auto;padding:28px 18px 50px}header,section{border-radius:14px;padding:clamp(16px,3vw,30px)}header{background:#163738;color:#fff}h1{font-size:clamp(28px,4vw,44px);margin:0 0 14px}h2{margin:0 0 10px;font-size:20px}section{background:white;border:1px solid #d8e2dc;margin:14px 0}form,.controls,.grid{display:flex;gap:12px;align-items:center;flex-wrap:wrap}form input{flex:1;min-width:180px}input,select,button{font:inherit;border-radius:7px;padding:9px 12px;border:1px solid #b7c6bd;background:white;color:#193432}button,summary{cursor:pointer}button:disabled{opacity:.6}.primary,button[aria-pressed=true]{background:#ace7ca;color:#123b29}.controls{margin-top:20px}.grid{align-items:stretch}.grid section{flex:1;min-width:230px;margin:0}.keys button{margin:3px}details{border-bottom:1px solid #e3e9e5;padding:10px 0}p,summary{overflow-wrap:anywhere}details p{white-space:pre-wrap}small{color:#4c635d}#msg{margin:8px 0 0;color:#dbede2}#info{font-size:14px;color:#445e54}select{max-width:100%}[hidden]{display:none}footer{font-size:14px;color:#52615a}
+</style><main><header><h1>BERT 스팀 리뷰 분석</h1><form id="search"><input id="url" aria-label="Steam 상점 주소 또는 게임 번호" placeholder="Steam 상점 주소 또는 게임 번호" required><button class="primary" id="submit">리뷰 분석</button></form><p id="msg" role="status">최신 한국어 리뷰를 최대 300개 분석해 이 PC에 저장합니다.</p></header>
+<div class="controls"><label>저장한 게임 <select id="game"></select></label><label>카테고리 <select id="cat"></select></label></div><p id="info"></p>
+<div class="grid"><section><h2>장점 키워드</h2><div class="keys" id="pos"></div></section><section><h2>단점 키워드</h2><div class="keys" id="neg"></div></section></div>
+<section><h2 id="title">근거 리뷰</h2><div id="quotes"></div><button id="more" hidden>더 보기</button></section>
+<section><h2>한 문장 분석</h2><form id="single"><input id="sentence" maxlength="1000" aria-label="리뷰 한 문장" value="캐릭터 이동이 너무 답답함" required><button>문장 분석</button></form><p id="prediction" role="status"></p></section>
+<footer>키워드 옆 숫자는 서로 다른 리뷰 수입니다. 주제와 감정은 KLUE BERT의 예측입니다.</footer></main><script>
+const $=id=>document.getElementById(id);let data,entries=[],offset=0,ticket=0;
+async function api(path,text){const r=await fetch(path,text===undefined?{}:{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:text});const d=await r.json();if(!r.ok)throw Error(d.error||'요청을 처리하지 못했습니다.');return d}
+function more(){for(const [i,s] of entries.slice(offset,offset+15)){const box=document.createElement('details'),summary=document.createElement('summary'),p=document.createElement('p');summary.textContent=s;p.textContent=data.reviews[i];box.append(summary,p);$('quotes').append(box)}offset+=15;$('more').hidden=offset>=entries.length}
+function render(){
+ if(!data)return;const category=$('cat').value;
+ $('info').textContent=data.games[0]+' · 리뷰 '+data.reviews.length+'개 · '+new Date(data.analyzed).toLocaleString('ko-KR');
+ $('quotes').textContent='키워드를 선택하면 근거 구절이 표시됩니다. 구절을 눌러 리뷰 전문을 확인하세요.';$('title').textContent='근거 리뷰';$('more').hidden=true;
+ for(const [side,pol] of [['pos','긍정'],['neg','부정']]){
+ const grouped=new Map(),box=$(side);box.replaceChildren();
+ for(const [i,s,j,keys] of data.evidence){if(data.labels[j]!==category+'·'+pol)continue;for(const k of keys){if(!grouped.has(k))grouped.set(k,new Map());grouped.get(k).set(i,s)}}
+ for(const [key,rows] of [...grouped].sort((a,b)=>(a[0]==='그 외 표현')-(b[0]==='그 외 표현')||b[1].size-a[1].size).slice(0,5)){
+ const b=document.createElement('button');b.textContent=key+' · '+rows.size;b.onclick=()=>{document.querySelectorAll('.keys button').forEach(x=>x.setAttribute('aria-pressed','false'));b.setAttribute('aria-pressed','true');$('title').textContent=key+' · '+pol+' 근거 리뷰';entries=[...rows];offset=0;$('quotes').replaceChildren();more()};box.append(b)}
+ if(!grouped.size)box.textContent='이 항목으로 분류된 구절이 없습니다.'}}
+function select(d){data=d;if(!$('cat').length)for(const k of d.labels.filter((_,i)=>i%2===0))$('cat').add(new Option(k.slice(0,-3)));$('game').value=d.key;localStorage.setItem('bert-game',d.key);render()}
+async function loadGame(){const id=++ticket;try{const d=await api('/result?key='+encodeURIComponent($('game').value));if(id===ticket)select(d)}catch(e){$('msg').textContent=e.message}}
+function option(key,name){const old=[...$('game').options].find(o=>o.value===key);if(old)old.text=name;else $('game').add(new Option(name,key))}
+$('game').onchange=loadGame;$('cat').onchange=render;$('more').onclick=more;
+$('search').onsubmit=async e=>{e.preventDefault();$('submit').disabled=true;$('msg').textContent='Steam 리뷰를 수집하고 BERT로 분석하는 중입니다…';try{const d=await api('/analyze',$('url').value);ticket++;option(d.key,d.games[0]);select(d);$('msg').textContent='리뷰 '+d.reviews.length+'개의 분석 결과를 저장했습니다.'}catch(err){$('msg').textContent=err.message}finally{$('submit').disabled=false}};
+$('single').onsubmit=async e=>{e.preventDefault();const btn=e.target.querySelector('button');btn.disabled=true;$('prediction').textContent='분석 중…';try{const d=await api('/sentence',$('sentence').value);$('prediction').textContent=d.tags.join(' / ')||'미분류'}catch(err){$('prediction').textContent=err.message}finally{btn.disabled=false}};
+(async()=>{const lib=await api('/library');for(const g of lib)option(g.key,g.name);const saved=localStorage.getItem('bert-game');if(lib.some(g=>g.key===saved))$('game').value=saved;else if(lib.some(g=>g.key==='sample-1245620'))$('game').value='sample-1245620';if(lib.length)await loadGame()})().catch(e=>{$('msg').textContent=e.message});
+</script></html>
