@@ -28,3 +28,11 @@ python experiment/predict.py "캐릭터 이동이 너무 답답함"
 ~~~
 
 bert-last-layer.pt에는 학습한 마지막 층과 분류기 파라미터가 들어 있다. 동일 조건으로 재학습하려면 저장소 루트에서 python experiment/train_bert.py를 실행한다. 실험 확인 후 git switch main으로 기준 버전으로 돌아갈 수 있다.
+
+## 브라우저 체험
+
+위의 패키지와 기본 모델을 준비한 뒤 저장소 루트에서 아래 명령을 실행하고 http://127.0.0.1:8766 을 엽니다. 학습한 BERT 체크포인트로 엘든 링 리뷰 30개를 표시하며, 직접 쓴 문장이나 다른 게임의 최신 한국어 리뷰 최대 300개도 분석할 수 있습니다.
+
+~~~powershell
+python experiment/preview.py
+~~~
