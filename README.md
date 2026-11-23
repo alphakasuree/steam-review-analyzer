@@ -34,3 +34,12 @@ Invoke-WebRequest "$modelUrl/onnx/model_quantized.onnx" -OutFile review_model/mo
 
 수집 방법은 [수집기 안내](STEAM_COLLECTOR_GUIDE.md), 데이터 출처와 필드는 [데이터 설명](steam_review_data/README.md)을 참고하세요.
 
+
+## 웹 버전
+
+Node.js 22 이상에서 아래 명령을 실행한 뒤 브라우저에서 http://127.0.0.1:8765 를 엽니다. Steam 상점 주소 또는 게임 번호를 입력하면 서버가 최신 한국어 리뷰를 최대 300개 가져와 기존 TF-IDF 모델로 분석합니다.
+
+~~~powershell
+node web/build.mjs
+node web/serve.mjs
+~~~

@@ -10,3 +10,4 @@ steam_collector_check/
 steam_review_data_*/
 .env
 .env.*
+web/dist/
