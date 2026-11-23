@@ -1,0 +1,59 @@
+{
+  "endpoint": "https://api.steampowered.com/IUserReviewsService/GetAppReviews/v1/",
+  "language": "koreana",
+  "ordering": "recent",
+  "purchase_type": "all",
+  "review_type": "all",
+  "filter_offtopic_activity": true,
+  "target_per_game": 2000,
+  "raw_count": 6000,
+  "clean_count": 4906,
+  "excluded_count": 1094,
+  "games": [
+    {
+      "app_id": 1245620,
+      "game_name": "ELDEN RING",
+      "collected_count": 2000,
+      "query_summary": {
+        "num_reviews": 100,
+        "review_score": 8,
+        "review_score_desc": "Very Positive",
+        "total_positive": 25710,
+        "total_negative": 2385,
+        "total_reviews": 28095
+      },
+      "started_at_utc": "2026-11-11T00:36:46.8194802+00:00",
+      "finished_at_utc": "2026-11-11T00:37:25.6091157+00:00"
+    },
+    {
+      "app_id": 413150,
+      "game_name": "Stardew Valley",
+      "collected_count": 2000,
+      "query_summary": {
+        "num_reviews": 100,
+        "review_score": 9,
+        "review_score_desc": "Overwhelmingly Positive",
+        "total_positive": 35470,
+        "total_negative": 689,
+        "total_reviews": 36159
+      },
+      "started_at_utc": "2026-11-11T00:37:25.6105504+00:00",
+      "finished_at_utc": "2026-11-11T00:38:03.5905456+00:00"
+    },
+    {
+      "app_id": 578080,
+      "game_name": "PUBG: BATTLEGROUNDS",
+      "collected_count": 2000,
+      "query_summary": {
+        "num_reviews": 100,
+        "review_score": 6,
+        "review_score_desc": "Mostly Positive",
+        "total_positive": 106532,
+        "total_negative": 41538,
+        "total_reviews": 148070
+      },
+      "started_at_utc": "2026-11-11T00:38:03.5906814+00:00",
+      "finished_at_utc": "2026-11-11T00:38:44.3393296+00:00"
+    }
+  ]
+}
