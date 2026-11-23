@@ -63,7 +63,8 @@ def seed():
         key='sample-'+app
         if not (CACHE/(key+'.json')).exists():save_result(key,classify(name+' · 저장 표본',rows))
 
-def fetch_game(raw):
+def fetch_game(raw, limit=1000):
+    if limit not in (300,1000,2000):raise ValueError('분석량은 300, 1000, 2000개 중 선택해 주세요.')
     url=urlsplit(raw)
     match=re.fullmatch(r'/app/([1-9][0-9]{0,9})(?:/[^?#]*)?',url.path)
     if re.fullmatch(r'[1-9][0-9]{0,9}',raw):key=raw
@@ -74,14 +75,14 @@ def fetch_game(raw):
     slug=url.path.strip('/').split('/')
     if len(slug)>2 and slug[2]:name=slug[2].replace('_',' ')+' · '+key
     game=int(key);seen=set();reviews=[];cursor='*';visited=set()
-    while cursor and cursor not in visited and len(reviews)<300 and len(visited)<4:
+    while cursor and cursor not in visited and len(reviews)<limit:
         visited.add(cursor)
-        page=fetch_page(dict(appid=game,languages=['koreana'],filter=1,purchase_type=1,review_type=0,num_per_page=min(100,300-len(reviews)),cursor=cursor),attempts=2)
+        page=fetch_page(dict(appid=game,languages=['koreana'],filter=1,purchase_type=1,review_type=0,num_per_page=min(100,limit-len(reviews)),cursor=cursor),attempts=2)
         for r in page['reviews']:
             if r['recommendationid'] not in seen and r.get('language')=='koreana' and r.get('review','').strip():
                 seen.add(r['recommendationid']);reviews.append(r['review'])
         cursor=page.get('cursor') if page['reviews'] else None
-        if cursor and len(reviews)<300:time.sleep(1.5)
+        if cursor and len(reviews)<limit:time.sleep(1.5)
     if not reviews:raise ValueError('분석할 한국어 리뷰가 없습니다.')
     return save_result(key,classify(name,reviews))
 
@@ -102,13 +103,16 @@ class Handler(BaseHTTPRequestHandler):
         except ValueError as e:return self.reply({'error':str(e)},400)
     def do_POST(self):
         try:
-            if self.path not in ('/analyze','/sentence'):return self.reply({},404)
+            url=urlsplit(self.path)
+            if url.path not in ('/analyze','/sentence'):return self.reply({},404)
             origin=self.headers.get('Origin')
             if origin and urlsplit(origin).netloc!=self.headers.get('Host'):return self.reply({},403)
             n=int(self.headers.get('Content-Length','0'))
             if not 0<n<=6000:raise ValueError('입력 길이를 확인해 주세요.')
             text=self.rfile.read(n).decode().strip()
-            if self.path=='/analyze':return self.reply(fetch_game(text))
+            if url.path=='/analyze':
+                limit=int(parse_qs(url.query).get('limit',['1000'])[0])
+                return self.reply(fetch_game(text,limit))
             if not 0<len(text)<=1000:raise ValueError('1~1000자 문장을 입력해 주세요.')
             with gate:tags=predict([text])[0]
             self.reply({'tags':tags})
@@ -124,4 +128,5 @@ if __name__=='__main__':
     server=ThreadingHTTPServer(('127.0.0.1',8767),Handler)
     print('http://127.0.0.1:8767',flush=True)
     server.serve_forever()
+
 
