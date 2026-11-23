@@ -60,6 +60,13 @@ records=load()
 opinions=[(i,s) for i,r in enumerate(records) for s in parts(r['review_text']) if re.search('[가-힣]',s)]
 terms={'그래픽':'그래픽 풍경 모델링 연출 디자인 도트 초상화 이펙트 비주얼 아트','스토리':'스토리 서사 세계관 엔딩 이야기 캐릭터 설정','운영':'업데이트 패치 문의 정지 핵 과금 운영 서버','게임플레이':'보스 전투 탐험 조작 난이도 농사 낚시 파밍 오픈월드 자유도 멀티 길찾기','최적화':'프레임 최적화 사양 로딩 렉 발적화','버그·안정성':'버그 오류 튕김 멈춤 프리징 접속 저장 강종','기타':'재미 가격 추천 힐링 음악 가성비'}
 aliases={'튕김':'튕|팅기','멈춤':'멈추|멈춤','재미':'재미|재밌|재밋|노잼|존잼','업데이트':'업데이트|업뎃|업댓','길찾기':r'길\s*찾','난이도':'난이도|어렵|어려','가격':'가격|돈값|비싸','프레임':'프레임|fps','저장':'저장|세이브','사양':'사양|똥컴'}
+# Windows 앱에서 파이썬 없이 실행할 TF-IDF 분류기의 학습 결과
+linear=models['TF-IDF'].estimators_
+portable=dict(vocab=vec.get_feature_names_out().tolist(),idf=vec.idf_.tolist(),
+    weights=[e.coef_[0].tolist() if hasattr(e,'coef_') else [] for e in linear],
+    bias=[float(e.intercept_[0]) if hasattr(e,'intercept_') else (100 if e.y_[0] else -100) for e in linear],
+    threshold=report['TF-IDF']['threshold'],labels=classes,terms=terms,aliases=aliases)
+Path('review_classifier.json').write_text(json.dumps(portable,ensure_ascii=False,separators=(',',':')),encoding='utf8')
 evidence=[]
 for start in range(0,len(opinions),256):
     chunk=opinions[start:start+256]; ss=[s for _,s in chunk]
@@ -74,3 +81,4 @@ payload=dict(games=[r['game_name'] for r in records],reviews=[r['review_text'] f
 template=Path('review_dashboard.template').read_text(encoding='utf8-sig') if False else Path('review_dashboard.template').read_text(encoding='utf-8-sig')
 Path('스팀 리뷰 분석.html').write_text(template.replace('/*DATA*/',json.dumps(payload,ensure_ascii=False).replace('<',r'\u003c')),encoding='utf8')
 print(len(records),len(opinions),len(evidence),flush=True)
+

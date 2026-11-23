@@ -12,7 +12,7 @@ public class Data {
     public object[][] evidence;
 }
 public class ReviewWindow : Form {
-    readonly Data data;
+    Data data; readonly Dictionary<string,Data> datasets=new Dictionary<string,Data>(); readonly LiveReviews live=new LiveReviews();
     ComboBox game = new ComboBox(), category = new ComboBox();
     ListBox positive = new ListBox(), negative = new ListBox(), excerpts = new ListBox();
     TextBox original = new TextBox();
@@ -55,7 +55,26 @@ public class ReviewWindow : Form {
         var quotes=Box("근거 구절",excerpts);layout.Controls.Add(quotes,0,4);layout.SetColumnSpan(quotes,2);
         original.Multiline=true;original.ReadOnly=true;original.ScrollBars=ScrollBars.Vertical;original.BackColor=Color.White;
         var full=Box("선택한 리뷰 원문",original);layout.Controls.Add(full,0,5);layout.SetColumnSpan(full,2);
-        game.Items.AddRange(data.games.Distinct().ToArray());
+                foreach(string name in data.games.Distinct())datasets[name]=data;
+        var bar=new FlowLayoutPanel {Dock=DockStyle.Top,Height=55,Padding=new Padding(16,8,0,0),WrapContents=false};
+        var address=new TextBox {Width=350,AccessibleName="Steam 게임 상점 주소"};
+        var run=new Button {Text="새 게임 분석",AutoSize=true};
+        bar.Controls.Add(new Label{Text="Steam 상점 주소",AutoSize=true,Margin=new Padding(0,5,8,0)});
+        bar.Controls.Add(address);bar.Controls.Add(run);Controls.Add(bar);
+        run.Click+=async (sender,args)=>{
+            run.Enabled=false;
+            try{
+                uint id=LiveReviews.AppId(address.Text);
+                status.Text="Steam에서 최신 한국어 리뷰를 가져오는 중…";
+                var added=await live.Fetch(id,300,new Progress<string>(s=>status.Text=s));
+                string name=added.games[0];datasets[name]=added;
+                if(!game.Items.Contains(name))game.Items.Add(name);
+                game.SelectedItem=name;Filter();
+            }catch(Exception error){status.Text="분석을 완료하지 못했어요.";MessageBox.Show(this,error.Message,"새 게임 분석");}
+            finally{run.Enabled=true;}
+        };
+        AcceptButton=run;
+game.Items.AddRange(data.games.Distinct().ToArray());
         category.Items.AddRange(data.labels.Select(x=>x.Substring(0,x.LastIndexOf('·'))).Distinct().ToArray());
         game.SelectedIndex=category.SelectedIndex=0;
         game.SelectedIndexChanged+=(s,e)=>Filter();category.SelectedIndexChanged+=(s,e)=>Filter();
@@ -66,6 +85,7 @@ public class ReviewWindow : Form {
     void Filter(){
         refreshing=true;
         string g=(string)game.SelectedItem,c=(string)category.SelectedItem;
+        data=datasets[g];
         status.Text=String.Format("분석 대상 {0:N0}개 리뷰   ·   AI 예측   ·   키워드를 선택하세요",data.games.Count(x=>x==g));
         foreach(var list in new[]{positive,negative}){
             var buckets=new Dictionary<string,Keyword>();
@@ -105,8 +125,9 @@ public class ReviewWindow : Form {
     [STAThread] public static int Main(string[] args){
         Application.EnableVisualStyles();Application.SetCompatibleTextRenderingDefault(false);
         using(var window=new ReviewWindow()){
-            if(args.Contains("--check"))window.Check();else Application.Run(window);
+            if(args.Length==2 && args[0]=="--check-url"){var result=window.live.Fetch(LiveReviews.AppId(args[1]),101,null).GetAwaiter().GetResult();if(result.reviews.Length==0||result.evidence.Length==0)return 2;var name=result.games[0];window.datasets[name]=result;window.game.Items.Add(name);window.game.SelectedItem=name;window.Check();}else if(args.Contains("--check"))window.Check();else Application.Run(window);
         }
         return 0;
     }
 }
+
