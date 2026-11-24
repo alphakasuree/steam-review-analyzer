@@ -1,7 +1,6 @@
-"""Run with python experiment/app.py and visit the printed loopback URL."""
+"""Run with python web/app.py and visit the printed loopback URL."""
 import json
 import re
-import sys
 import time
 from pathlib import Path
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -10,15 +9,18 @@ from threading import Lock
 from datetime import datetime, timezone
 from tempfile import NamedTemporaryFile
 from urllib.error import URLError
-from predict import ROOT, load_predictor
-sys.path.insert(0,str(ROOT))
-from collect_steam_reviews import fetch_page
+from predict import ROOT, WEB, load_predictor
+from collect_steam_reviews import fetch_page, SteamResponseError
 from review_data import parts
 import csv
+import hashlib
 
 labels,predict=load_predictor()
+training_counts=json.loads((WEB/'results.json').read_text(encoding='utf8'))['training_label_counts']
+with (WEB/'bert-last-layer.pt').open('rb') as checkpoint:
+    model_id=hashlib.file_digest(checkpoint,'sha256').hexdigest()
 gate=Lock()
-rules=json.loads((ROOT/'review_classifier.json').read_text(encoding='utf8'))
+rules=json.loads((WEB/'review_classifier.json').read_text(encoding='utf8'))
 def classify(name,reviews):
     excerpts=[(i,s) for i,r in enumerate(reviews) for s in parts(r) if re.search('[가-힣]',s)]
     evidence=[]
@@ -30,14 +32,17 @@ def classify(name,reviews):
             for tag in tags:
                 keys=[k for k in rules['terms'][tag.rsplit('·',1)[0]].split() if re.search(rules['aliases'].get(k,k),s,re.I)]
                 evidence.append([i,s,labels.index(tag),keys or ['그 외 표현']])
-    return dict(games=[name]*len(reviews),reviews=reviews,labels=labels,evidence=evidence,analyzed=datetime.now(timezone.utc).isoformat())
+    return dict(games=[name]*len(reviews),reviews=reviews,labels=labels,evidence=evidence,model_id=model_id,training_counts=training_counts,analyzed=datetime.now(timezone.utc).isoformat())
 
 
 CACHE=ROOT/'.bert_runs'/'library-v1'
 CACHE.mkdir(parents=True,exist_ok=True)
 def read_result(key):
     if not re.fullmatch(r'(?:sample-)?[1-9][0-9]{0,9}',key):raise ValueError('잘못된 게임 번호입니다.')
-    return json.loads((CACHE/(key+'.json')).read_text(encoding='utf8'))
+    result=json.loads((CACHE/(key+'.json')).read_text(encoding='utf8'))
+    if result.get('model_id')==model_id:
+        result.setdefault('training_counts',training_counts)
+    return result
 
 def save_result(key,result):
     result['key']=key
@@ -54,14 +59,15 @@ def library():
     return sorted(summaries,key=lambda r:r['analyzed'],reverse=True)
 
 def seed():
-    with (ROOT/'steam_review_data/reviews_clean.csv').open(encoding='utf-8-sig',newline='') as f:
+    with (WEB/'data/reviews_clean.csv').open(encoding='utf-8-sig',newline='') as f:
         groups={}
         for r in csv.DictReader(f):
             name,rows=groups.setdefault(r['app_id'],(r['game_name'],[]))
             if len(rows)<100 and r['has_hangul']=='True':rows.append(r['review_text'])
     for app,(name,rows) in groups.items():
         key='sample-'+app
-        if not (CACHE/(key+'.json')).exists():save_result(key,classify(name+' · 저장 표본',rows))
+        if not (CACHE/(key+'.json')).exists() or read_result(key).get('model_id')!=model_id:
+            save_result(key,classify(name+' · 저장 표본',rows))
 
 def fetch_game(raw, limit=1000):
     if limit not in (300,1000,2000):raise ValueError('분석량은 300, 1000, 2000개 중 선택해 주세요.')
@@ -86,7 +92,7 @@ def fetch_game(raw, limit=1000):
     if not reviews:raise ValueError('분석할 한국어 리뷰가 없습니다.')
     return save_result(key,classify(name,reviews))
 
-html=(ROOT/'experiment'/'dashboard.html').read_text(encoding='utf8')
+html=(WEB/'dashboard.html').read_text(encoding='utf8')
 class Handler(BaseHTTPRequestHandler):
     def reply(self,data,status=200,mime='application/json'):
         body=(data if mime=='text/html' else json.dumps(data,ensure_ascii=False)).encode()
@@ -117,6 +123,7 @@ class Handler(BaseHTTPRequestHandler):
             with gate:tags=predict([text])[0]
             self.reply({'tags':tags})
         except ValueError as e:self.reply({'error':str(e)},400)
+        except SteamResponseError as e:self.reply({'error':str(e)},502)
         except (TimeoutError,URLError):self.reply({'error':'Steam에 연결할 수 없습니다. 잠시 후 다시 시도해 주세요.'},502)
         except Exception:
             import traceback

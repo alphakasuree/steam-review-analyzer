@@ -19,7 +19,9 @@ function render(){
  for(const [i,s,j,keys] of data.evidence){if(data.labels[j]!==category+'·'+pol)continue;for(const k of keys){if(!grouped.has(k))grouped.set(k,new Map());grouped.get(k).set(i,s)}}
  for(const [key,rows] of [...grouped].sort((a,b)=>(a[0]==='그 외 표현')-(b[0]==='그 외 표현')||b[1].size-a[1].size).slice(0,5)){
  const b=document.createElement('button');b.textContent=key+' · '+rows.size;b.onclick=()=>{document.querySelectorAll('.keys button').forEach(x=>x.setAttribute('aria-pressed','false'));b.setAttribute('aria-pressed','true');$('title').textContent=key+' · '+pol+' 근거 리뷰';entries=[...rows];offset=0;$('quotes').replaceChildren();more()};box.append(b)}
- if(!grouped.size)box.textContent='이 항목으로 분류된 구절이 없습니다.'}}
+ if(!grouped.size)box.textContent='이 항목으로 분류된 구절이 없습니다.';
+ const count=data.training_counts?.[category+'·'+pol];
+ if(count===0||count===1){const note=document.createElement('p');note.textContent='학습 사례 부족 · 이 항목의 학습 예문 '+count+'개';box.prepend(note)}}}
 function select(d){data=d;if(!$('cat').length)for(const k of d.labels.filter((_,i)=>i%2===0))$('cat').add(new Option(k.slice(0,-3)));$('game').value=d.key;localStorage.setItem('bert-game',d.key);render()}
 async function loadGame(){const id=++ticket;try{const d=await api('/result?key='+encodeURIComponent($('game').value));if(id===ticket)select(d)}catch(e){$('msg').textContent=e.message}}
 function option(key,name){const old=[...$('game').options].find(o=>o.value===key);if(old)old.text=name;else $('game').add(new Option(name,key))}

@@ -7,7 +7,7 @@ function Ready {
 if (Ready) {Start-Process $address; exit 0}
 $python=Join-Path $PWD '.bert_venv/Scripts/python.exe'
 if (!(Test-Path $python) -and (Test-Path '.bert_lib/torch')) {
-    $pkg=Get-AppxPackage 'OpenAI.CodexPrimaryRuntime*' | Sort-Object Version -Descending | Select-Object -First 1
+    $pkg=Get-AppxPackage 'OpenAI.CodexPrimaryRuntime*' -ErrorAction SilentlyContinue | Sort-Object Version -Descending | Select-Object -First 1
     if ($pkg) {
         $bundled=Join-Path $pkg.InstallLocation 'dependencies/python/python.exe'
         if (Test-Path $bundled) {$python=$bundled}
@@ -20,7 +20,7 @@ if (!(Test-Path $python)) {
 }
 & $python -c "import sys; sys.path.insert(0,'.bert_lib'); import importlib.util as u; sys.exit(0 if u.find_spec('transformers') and u.find_spec('torch') else 1)"
 if ($LASTEXITCODE -ne 0) {
-    & $python -m pip install -r experiment/requirements.txt
+    & $python -m pip install -r web/requirements.txt
     if ($LASTEXITCODE -ne 0) {throw 'Package installation failed.'}
 }
 $revision='77c8b3d707df785034b4e50f2da5d37be5f0f546'
@@ -33,7 +33,8 @@ foreach($n in 'config.json','tokenizer.json','special_tokens_map.json','tokenize
         Move-Item -LiteralPath "$file.part" -Destination $file
     }
 }
-$proc=Start-Process -FilePath $python -ArgumentList 'experiment/app.py' -WorkingDirectory $PWD.Path -WindowStyle Hidden -RedirectStandardError '.bert_runs/app-error.log' -PassThru
+Set-Content -LiteralPath '.bert_model/revision.txt' -Value $revision -Encoding ascii
+$proc=Start-Process -FilePath $python -ArgumentList 'web/app.py' -WorkingDirectory $PWD.Path -WindowStyle Hidden -RedirectStandardError '.bert_runs/app-error.log' -PassThru
 for($i=0;$i -lt 180;$i++){
     if(Ready){Start-Process $address;exit 0}
     if($proc.HasExited){throw (Get-Content '.bert_runs/app-error.log' -Tail 8 | Out-String)}

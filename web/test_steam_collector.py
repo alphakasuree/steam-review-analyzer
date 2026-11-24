@@ -17,6 +17,14 @@ def review(review_id, text="전투는 좋지만 버그가 많다", minutes=600):
 
 
 class CollectorTests(unittest.TestCase):
+    def test_empty_page_and_failed_request_are_distinct(self):
+        empty = {"response":{"query_summary":{"num_reviews":0},"cursor":"*","total_matching":0}}
+        self.assertEqual(collector.parse_page(empty, "1")["reviews"], [])
+        with self.assertRaisesRegex(collector.SteamResponseError, "42"):
+            collector.parse_page({"response":{}}, "42")
+        with self.assertRaises(collector.SteamResponseError):
+            collector.parse_page({"response":{"reviews":"invalid"}}, "1")
+
     def test_pagination_deduplication_and_csv_roundtrip(self):
         pages = [
             {"reviews": [review("1", '음악, "최고"\n재미있다')], "cursor": "next+/=", "query_summary": {}},

@@ -2,15 +2,16 @@
 import argparse
 import sys
 from pathlib import Path
-ROOT=Path(__file__).resolve().parents[1]
+WEB=Path(__file__).resolve().parent
+ROOT=WEB.parent
 sys.path[:0]=[str(ROOT/'.bert_lib'),str(ROOT/'.review_lib')]
 import torch
 from torch import nn
 from transformers import AutoTokenizer, BertModel
 
-def load_predictor():
+def load_predictor(checkpoint=None):
     model_dir=ROOT/'.bert_model'
-    state=torch.load(ROOT/'experiment'/'bert-last-layer.pt',map_location='cpu',weights_only=True)
+    state=torch.load(checkpoint or WEB/'bert-last-layer.pt',map_location='cpu',weights_only=True)
     tokenizer=AutoTokenizer.from_pretrained(model_dir,local_files_only=True)
     model=BertModel.from_pretrained(model_dir,local_files_only=True,attn_implementation='eager')
     model.encoder.layer[-1].load_state_dict(state['block'])

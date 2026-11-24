@@ -68,17 +68,34 @@ def retry_delay(header, attempt):
     return max(0, delay)
 
 
+class SteamResponseError(RuntimeError):
+    pass
+
+
+def parse_page(payload, result_code=None):
+    if result_code not in (None, "1"):
+        raise SteamResponseError(f"Steam에서 이 게임의 리뷰 조회를 처리하지 못했습니다. 상점 주소를 확인해 주세요. (Steam 코드 {result_code})")
+    page = payload.get("response", payload) if isinstance(payload, dict) else None
+    if isinstance(page, dict):
+        if isinstance(page.get("reviews"), list):
+            return page
+        summary = page.get("query_summary") or {}
+        if "reviews" not in page and (
+            page.get("total_matching") == 0 or
+            isinstance(summary, dict) and summary.get("num_reviews") == 0 or
+            result_code == "1" and not page
+        ):
+            return dict(page, reviews=[])
+    raise SteamResponseError("Steam 응답에서 리뷰 목록을 읽을 수 없습니다. 잠시 후 다시 시도해 주세요.")
+
+
 def fetch_page(parameters, attempts=5):
     query = urlencode({"input_json": json.dumps(parameters, ensure_ascii=False)})
     request = Request(ENDPOINT + "?" + query, headers={"User-Agent": "SteamReviewCourseProject/1.0"})
     for attempt in range(attempts):
         try:
             with urlopen(request, timeout=45) as response:
-                payload = json.load(response)
-            page = payload.get("response", payload)
-            if not isinstance(page, dict) or not isinstance(page.get("reviews"), list):
-                raise ValueError("Unexpected Steam response: reviews list is missing")
-            return page
+                return parse_page(json.load(response), response.headers.get("X-EResult"))
         except HTTPError as error:
             if error.code not in (408, 429, 500, 502, 503, 504) or attempt == attempts - 1:
                 raise
